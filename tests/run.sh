@@ -15,13 +15,14 @@ postgres="${NAME}-postgres"
 redis="${NAME}-redis"
 shared="${NAME}-shared"
 web="${NAME}-web"
+job="${NAME}-job"
 
 cleanup() {
     local status=$?
     if [[ "${status}" -ne 0 ]]; then
         docker logs --tail 50 "${web}" 2>&1 || true
     fi
-    docker rm -vf "${web}" "${postgres}" "${redis}" > /dev/null 2>&1 || true
+    docker rm -vf "${job}" "${web}" "${postgres}" "${redis}" > /dev/null 2>&1 || true
     docker volume rm -f "${shared}" > /dev/null 2>&1 || true
     docker network rm "${network}" > /dev/null 2>&1 || true
     exit "${status}"
@@ -61,21 +62,22 @@ done
 docker exec "${postgres}" psql -U discourse -d discourse -qc \
     'CREATE EXTENSION IF NOT EXISTS hstore; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS vector;'
 
-docker run -d --name "${web}" --network "${network}" \
-    -e DISCOURSE_HOSTNAME=discourse.example.com \
-    -e DISCOURSE_DEVELOPER_EMAILS=admin@example.com \
-    -e DISCOURSE_FORCE_HTTPS=true \
-    -e DISCOURSE_DB_HOST="${postgres}" \
-    -e DISCOURSE_DB_PORT=5432 \
-    -e DISCOURSE_DB_NAME=discourse \
-    -e DISCOURSE_DB_USERNAME=discourse \
-    -e 'DISCOURSE_DB_PASSWORD=discourse p@ss/w:rd#1' \
-    -e DISCOURSE_REDIS_HOST="${redis}" \
-    -e DISCOURSE_REDIS_PORT=6379 \
-    -e DISCOURSE_SMTP_ADDRESS=localhost \
-    -e DISCOURSE_SMTP_PORT=25 \
-    -v "${shared}:/shared" \
-    "${IMAGE}" > /dev/null
+env_args=(
+    -e DISCOURSE_HOSTNAME=discourse.example.com
+    -e DISCOURSE_DEVELOPER_EMAILS=admin@example.com
+    -e DISCOURSE_FORCE_HTTPS=true
+    -e DISCOURSE_DB_HOST="${postgres}"
+    -e DISCOURSE_DB_PORT=5432
+    -e DISCOURSE_DB_NAME=discourse
+    -e DISCOURSE_DB_USERNAME=discourse
+    -e 'DISCOURSE_DB_PASSWORD=discourse p@ss/w:rd#1'
+    -e DISCOURSE_REDIS_HOST="${redis}"
+    -e DISCOURSE_REDIS_PORT=6379
+    -e DISCOURSE_SMTP_ADDRESS=localhost
+    -e DISCOURSE_SMTP_PORT=25
+)
+
+docker run -d --name "${web}" --network "${network}" "${env_args[@]}" -v "${shared}:/shared" "${IMAGE}" > /dev/null
 
 # The first start migrates the database and compiles the stylesheets.
 echo -n "Starting Discourse... "
@@ -105,4 +107,21 @@ expect "Serving compressed scripts" \
 echo -n "Creating a backup... "
 docker exec "${web}" make backup filepath=/shared/backups/test.tar.gz -f /usr/local/bin/actions.mk > /dev/null
 docker exec "${web}" test -s /shared/backups/test.tar.gz
+echo "OK"
+
+# Wodby runs backups and cron jobs as separate containers of the same image, with the command as
+# arguments. They must run it and exit, not boot a second Discourse.
+echo -n "Creating a backup in a job container... "
+docker run -d --name "${job}" --network "${network}" "${env_args[@]}" -v "${shared}:/shared" "${IMAGE}" \
+    make -f /usr/local/bin/actions.mk backup filepath=/shared/backups/job.tar.gz > /dev/null
+for _ in $(seq 1 60); do
+    [[ "$(docker inspect -f '{{.State.Running}}' "${job}")" == false ]] && break
+    sleep 5
+done
+if [[ "$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "${job}")" != "false 0" ]]; then
+    echo "Error: the job did not finish in 5 minutes or failed"
+    docker logs --tail 20 "${job}"
+    exit 1
+fi
+docker exec "${web}" test -s /shared/backups/job.tar.gz
 echo "OK"

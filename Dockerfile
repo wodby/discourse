@@ -200,6 +200,23 @@ exec thpoff chpst -u discourse:www-data -U discourse:www-data \
   bundle exec config/unicorn_launcher -E production -c config/unicorn.conf.rb
 SCRIPT
 
+# Without arguments the container boots Discourse under runit: nginx, Unicorn and Sidekiq. With
+# arguments, as in a backup or cron job, it writes the settings, waits for the database and Redis
+# when they are configured, and runs them instead of booting a second Discourse. It leaves the shared volume as it is, because the
+# running Discourse may be using it.
+cat > /usr/local/bin/docker-entrypoint <<'SCRIPT'
+#!/usr/bin/env bash
+set -e
+if [[ $# -eq 0 ]]; then
+  exec /sbin/boot
+fi
+/etc/runit/1.d/10-copy-env
+if [[ -n "${DISCOURSE_DB_HOST:-}" ]]; then
+  /etc/runit/1.d/30-wait-for-dependencies
+fi
+exec "$@"
+SCRIPT
+
 cat > /usr/local/bin/discourse <<'SCRIPT'
 #!/usr/bin/env bash
 set -e
@@ -300,6 +317,7 @@ chmod +x \
   /etc/service/nginx/run \
   /etc/service/unicorn/run \
   /usr/local/bin/discourse \
+  /usr/local/bin/docker-entrypoint \
   /usr/local/bin/health \
   /usr/local/bin/wait_for_tcp
 EOF
@@ -309,4 +327,4 @@ WORKDIR /var/www/discourse
 EXPOSE 80
 VOLUME /shared
 
-ENTRYPOINT ["/sbin/boot"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint"]
