@@ -1,0 +1,106 @@
+name: Build docker image
+
+on:
+  push:
+    branches:
+      - main
+
+    tags:
+      - '*'
+      - '!*-r[0-9]*'
+
+  pull_request:
+
+env:
+  # The monthly release and the extended support release (ESR).
+  DISCOURSE_RELEASE: '2026.10.0'
+  DISCOURSE_ESR: '2026.7.4'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      discourse-versions: ${{ steps.set-matrix.outputs.discourse-versions }}
+    steps:
+      - id: set-matrix
+        run: |
+          cat << 'EOF' > versions.json
+          [
+            {"key": "release", "version": "${{ env.DISCOURSE_RELEASE }}", "latest": "latest"},
+            {"key": "esr", "version": "${{ env.DISCOURSE_ESR }}", "latest": ""}
+          ]
+          EOF
+          echo "discourse-versions=$(cat versions.json | jq -c .)" >> $GITHUB_OUTPUT
+
+  build:
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        discourse: ${{ fromJson(needs.setup.outputs.discourse-versions) }}
+        arch:
+          - amd64
+          - arm64
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and test
+        env:
+          DISCOURSE_VER: ${{ matrix.discourse.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          make
+          make test
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Push architecture image
+        if: github.event_name == 'push'
+        env:
+          DISCOURSE_VER: ${{ matrix.discourse.version }}
+          ARCH: ${{ matrix.arch }}
+        run: make push
+
+  push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build
+    strategy:
+      matrix:
+        discourse: ${{ fromJson(needs.setup.outputs.discourse-versions) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - uses: ./.github/actions
+        with:
+          version: ${{ matrix.discourse.version }}
+          latest: ${{ matrix.discourse.latest }}
+
+  image-revision-aliases:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/r')
+    needs: [ push ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: image-revision-aliases-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: wodby/images/.github/actions/image-revision-aliases@aee656b81ae84e0dca0cfdbea173057abe4a9426
+        with:
+          docker_username: ${{ secrets.DOCKER_USERNAME }}
+          docker_password: ${{ secrets.DOCKER_PASSWORD }}
