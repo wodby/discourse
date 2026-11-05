@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "image": "wodby/discourse",
+  "versions": [
+    {
+      "version": {
+        "env": "DISCOURSE_RELEASE"
+      },
+      "variants": [
+        {
+          "short": [
+            "{minor}"
+          ],
+          "full": "{version}"
+        }
+      ]
+    },
+    {
+      "version": {
+        "env": "DISCOURSE_ESR"
+      },
+      "variants": [
+        {
+          "short": [
+            "{minor}"
+          ],
+          "full": "{version}"
+        }
+      ]
+    }
+  ]
+}
