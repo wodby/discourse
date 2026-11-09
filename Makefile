@@ -9,8 +9,8 @@ DISCOURSE_VER_MINOR := $(basename $(DISCOURSE_VER))
 # Discourse publishes web-only base images for its main branch and for the ESR
 # line, with the Ruby and JavaScript dependencies of that line installed. The
 # monthly release uses the dated main image; the ESR line uses the -stable one.
-DISCOURSE_BASE_TAG_2026.10 := 2.0.20261108-0018-web-only
-DISCOURSE_BASE_TAG_2026.7 := 2.0.20261108-0018-web-only-stable
+DISCOURSE_BASE_TAG_2026.10 := 2.0.20261109-0018-web-only
+DISCOURSE_BASE_TAG_2026.7 := 2.0.20261109-0018-web-only-stable
 
 TAG ?= $(DISCOURSE_VER_MINOR)
 
