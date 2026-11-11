@@ -3,7 +3,7 @@
 # A Discourse release, such as 2026.10.0. Its first two parts name the release
 # line the image is published for: 2026.10 for the monthly release, 2026.7 for
 # the extended support release (ESR).
-DISCOURSE_VER ?= 2026.10.0
+DISCOURSE_VER ?= 2026.10.1
 DISCOURSE_VER_MINOR := $(basename $(DISCOURSE_VER))
 
 # Discourse publishes web-only base images for its main branch and for the ESR

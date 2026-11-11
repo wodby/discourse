@@ -13,8 +13,8 @@ on:
 
 env:
   # The monthly release and the extended support release (ESR).
-  DISCOURSE_RELEASE: '2026.10.0'
-  DISCOURSE_ESR: '2026.7.4'
+  DISCOURSE_RELEASE: '2026.10.1'
+  DISCOURSE_ESR: '2026.7.5'
 
 jobs:
   setup:
