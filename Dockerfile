@@ -120,7 +120,12 @@ RUN set -e; \
 RUN <<'EOF'
 set -eu
 
-mkdir -p /etc/runit/1.d /etc/runit/3.d /etc/service/nginx /etc/service/unicorn /usr/local/bin
+mkdir -p /etc/runit/1.d /etc/runit/3.d /etc/service/cron /etc/service/nginx /etc/service/unicorn /usr/local/bin
+
+# The hourly anacron entry starts anacron through invoke-rc.d, which the image's
+# policy-rc.d always refuses, so it only prints the refusal. The base image's
+# /etc/cron.d/cron.d_anacron runs the daily jobs instead.
+rm -f /etc/cron.d/anacron
 
 cat > /etc/runit/1.d/10-copy-env <<'SCRIPT'
 #!/usr/bin/env bash
@@ -173,6 +178,21 @@ SCRIPT
 cat > /etc/runit/3.d/20-unicorn <<'SCRIPT'
 #!/usr/bin/env bash
 sv stop unicorn || true
+SCRIPT
+
+# When a job writes output, Debian cron allocates 4 bytes per allowed open file
+# before mailing it. Container runtimes such as containerd can allow about a
+# billion open files, which makes that allocation about 4 GB and gets the
+# container OOM-killed, so cron and its jobs run with a lower limit.
+cat > /etc/service/cron/run <<'SCRIPT'
+#!/bin/bash
+exec 2>&1
+cd /
+nofile="$(ulimit -n)"
+if [[ "${nofile}" == "unlimited" ]] || (( nofile > 65536 )); then
+  ulimit -n 65536
+fi
+exec cron -f
 SCRIPT
 
 cat > /etc/service/nginx/run <<'SCRIPT'
@@ -315,6 +335,7 @@ chmod +x \
   /etc/runit/3.d/10-nginx \
   /etc/runit/3.d/20-unicorn \
   /etc/service/nginx/run \
+  /etc/service/cron/run \
   /etc/service/unicorn/run \
   /usr/local/bin/discourse \
   /usr/local/bin/docker-entrypoint \

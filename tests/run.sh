@@ -77,7 +77,9 @@ env_args=(
     -e DISCOURSE_SMTP_PORT=25
 )
 
-docker run -d --name "${web}" --network "${network}" "${env_args[@]}" -v "${shared}:/shared" "${IMAGE}" > /dev/null
+# A high open-file limit, as container runtimes such as containerd grant.
+docker run -d --name "${web}" --network "${network}" "${env_args[@]}" -v "${shared}:/shared" \
+    --ulimit nofile=1048576:1048576 "${IMAGE}" > /dev/null
 
 # The first start migrates the database and compiles the stylesheets.
 echo -n "Starting Discourse... "
@@ -103,6 +105,16 @@ fi
 expect "Serving compiled scripts" "$(status "/assets/${asset}")" "200"
 expect "Serving compressed scripts" \
     "$(request -o /dev/null -D - -H 'Accept-Encoding: br, gzip' "http://localhost/assets/${asset}" | tr 'A-Z' 'a-z')" "content-encoding: br"
+
+# Cron jobs that write output must not allocate memory for every allowed open file.
+expect "Limiting open files for cron" \
+    "$(docker exec "${web}" sh -c 'grep "Max open files" "/proc/$(pgrep -o -x cron)/limits"')" "65536"
+expect "Running anacron daily without the hourly entry" \
+    "$(docker exec "${web}" sh -c 'grep -h anacron /etc/cron.d/*')" "anacron -s"
+if docker exec "${web}" test -e /etc/cron.d/anacron; then
+    echo "Error: the hourly anacron entry is still installed"
+    exit 1
+fi
 
 echo -n "Creating a backup... "
 docker exec "${web}" make backup filepath=/shared/backups/test.tar.gz -f /usr/local/bin/actions.mk > /dev/null
