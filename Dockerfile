@@ -122,6 +122,11 @@ set -eu
 
 mkdir -p /etc/runit/1.d /etc/runit/3.d /etc/service/cron /etc/service/nginx /etc/service/unicorn /usr/local/bin
 
+# The hourly anacron entry starts anacron through invoke-rc.d, which the image's
+# policy-rc.d always refuses, so it only prints the refusal. The base image's
+# /etc/cron.d/cron.d_anacron runs the daily jobs instead.
+rm -f /etc/cron.d/anacron
+
 cat > /etc/runit/1.d/10-copy-env <<'SCRIPT'
 #!/usr/bin/env bash
 set -e

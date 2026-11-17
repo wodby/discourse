@@ -109,6 +109,12 @@ expect "Serving compressed scripts" \
 # Cron jobs that write output must not allocate memory for every allowed open file.
 expect "Limiting open files for cron" \
     "$(docker exec "${web}" sh -c 'grep "Max open files" "/proc/$(pgrep -o -x cron)/limits"')" "65536"
+expect "Running anacron daily without the hourly entry" \
+    "$(docker exec "${web}" sh -c 'grep -h anacron /etc/cron.d/*')" "anacron -s"
+if docker exec "${web}" test -e /etc/cron.d/anacron; then
+    echo "Error: the hourly anacron entry is still installed"
+    exit 1
+fi
 
 echo -n "Creating a backup... "
 docker exec "${web}" make backup filepath=/shared/backups/test.tar.gz -f /usr/local/bin/actions.mk > /dev/null
