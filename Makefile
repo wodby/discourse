@@ -3,14 +3,14 @@
 # A Discourse release, such as 2026.10.0. Its first two parts name the release
 # line the image is published for: 2026.10 for the monthly release, 2026.7 for
 # the extended support release (ESR).
-DISCOURSE_VER ?= 2026.10.2
+DISCOURSE_VER ?= 2026.10.3
 DISCOURSE_VER_MINOR := $(basename $(DISCOURSE_VER))
 
 # Discourse publishes web-only base images for its main branch and for the ESR
 # line, with the Ruby and JavaScript dependencies of that line installed. The
 # monthly release uses the dated main image; the ESR line uses the -stable one.
-DISCOURSE_BASE_TAG_2026.10 := 2.0.20261124-0015-web-only
-DISCOURSE_BASE_TAG_2026.7 := 2.0.20261124-0015-web-only-stable
+DISCOURSE_BASE_TAG_2026.10 := 2.0.20261125-0016-web-only
+DISCOURSE_BASE_TAG_2026.7 := 2.0.20261125-0016-web-only-stable
 
 TAG ?= $(DISCOURSE_VER_MINOR)
 
