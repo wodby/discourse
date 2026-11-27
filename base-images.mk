@@ -3,8 +3,8 @@
 BASE_IMAGE_REPOSITORY := discourse/base
 BASE_IMAGE_VERSION_SUFFIX :=
 
-BASE_IMAGE_DIGEST_2.0.20261125-0016-web-only := sha256:83564af4c973eedd4ccfa878f32e274ba93c433f324e74e2fdd32182b7c1b4e4
-BASE_IMAGE_DIGEST_2.0.20261125-0016-web-only-stable := sha256:d19a8ff29cad6fcae327824d91d4a269782ac9f8a8f6c90f49e53f6c9f06f663
+BASE_IMAGE_DIGEST_2.0.20261127-0016-web-only := sha256:32caf5a0045d3fb539b730ee43e20f1b7ca753ca451bc016d808e4cc6995cdd6
+BASE_IMAGE_DIGEST_2.0.20261127-0016-web-only-stable := sha256:fdf31fccd493c4dbebae98928bc4c89d40a500cfec40f52a8d6b25d5cd628916
 
 # Fail before building when a version has no reviewed pin.
 BASE_IMAGE = $(BASE_IMAGE_REPOSITORY):$(BASE_IMAGE_TAG)@$(or $(BASE_IMAGE_DIGEST_$(BASE_IMAGE_TAG)),$(error No base image digest for $(BASE_IMAGE_REPOSITORY):$(BASE_IMAGE_TAG); update base-images.mk))
